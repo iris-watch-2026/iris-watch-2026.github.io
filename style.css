@@ -62,3 +62,12 @@ body .reorder-ghost{border:1px solid #168b5d!important;border-radius:10px!import
 #personList .candidate-handle{order:1}
 #personList .candidate-genre{order:2}
 #personList .patrol-chip{order:3}
+
+/* One-file data transport: modest visual emphasis, no visual clutter in cards. */
+.all-backup-box{margin:12px 0;padding:12px;border:1px solid #ccd9d3;border-radius:10px;background:#f4faf7}
+.all-backup-box h3{font-size:15px;margin:0 0 5px}
+.all-backup-box p{margin:4px 0 10px}
+.all-backup-box button{font-size:13px}
+.all-backup-box .restore-preview{background:#fff}
+.legacy-backup{margin:14px 0;padding:10px 0;border-top:1px solid var(--line)}
+.legacy-backup>summary{font-size:12px;color:var(--muted)}
