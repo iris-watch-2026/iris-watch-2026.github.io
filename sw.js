@@ -3,13 +3,13 @@
 // Change this version whenever any runtime file changes before deployment.
 // The old root worker deletes x-patrol-*; this separate prefix survives it.
 const CACHE_PREFIX = 'xp054-watch-shell-';
-const CACHE_NAME = `${CACHE_PREFIX}20261024-iris-watch-org-v1`;
+const CACHE_NAME = `${CACHE_PREFIX}20261024-iris-watch-org-v2`;
 const APP_ROOT = new URL(self.registration.scope);
 const INDEX_URL = new URL('index.html', APP_ROOT).href;
 const REQUIRED_FILES = Object.freeze([
  'index.html','style.css','app.mjs','core.mjs','storage.mjs','migration.mjs',
  'candidate-ui.mjs','reorder-ui.mjs','rss.mjs','analytics.mjs',
- 'manifest.webmanifest','sw.js','icon.svg'
+ 'manifest.webmanifest','sw.js','icon.svg','combined-backup.mjs'
 ]);
 const ASSET_URLS = REQUIRED_FILES.map(file => new URL(file, APP_ROOT).href);
 const ASSET_SET = new Set(ASSET_URLS);
