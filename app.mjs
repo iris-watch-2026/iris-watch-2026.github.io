@@ -3,7 +3,8 @@ import {createStore} from './storage.mjs';
 import {patrolState,sortCandidates,shortGenres} from './candidate-ui.mjs';
 import {setupReorder} from './reorder-ui.mjs';
 import {PILOT_HANDLES,readFeed,applyFeedResults,recordFeedAttempt,dueHandles,feedState,RSS_REQUEST_SPACING_MS} from './rss.mjs';
-import {setupAnalytics,analyticsFor,primeCandidates,refreshMetrics} from './analytics.mjs';
+import {setupAnalytics,analyticsFor,primeCandidates,refreshMetrics,snapshotAnalytics,validateAnalyticsSnapshot,applyAnalyticsSnapshot} from './analytics.mjs';
+import {encodeCombinedBackup,decodeCombinedBackup,COMBINED_MAX_BYTES} from './combined-backup.mjs';
 const $=id=>document.getElementById(id);
 const el=(tag,text='',cls='')=>{const n=document.createElement(tag);n.textContent=text;if(cls)n.className=cls;return n;};
 const on=(id,type,fn)=>$(id).addEventListener(type,e=>{try{Promise.resolve(fn(e)).catch(error=>notice(error.message||'処理できませんでした。',true));}catch(error){notice(error.message||'処理できませんでした。',true);}});
@@ -164,6 +165,64 @@ on('genreForm','submit',async e=>{e.preventDefault();const input={id:$('genreId'
 on('morning','click',()=>save(d=>startSession(d,'朝'),'朝の巡回を開始しました。'));on('night','click',()=>save(d=>startSession(d,'夜'),'夜の巡回を開始しました。'));
 function download(value,name){const u=URL.createObjectURL(new Blob([value],{type:'application/json;charset=utf-8'})),a=el('a');a.href=u;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);}
 on('export','click',async()=>{await queue.catch(()=>{});const r=await store.load();data=r.data;revision=r.revision;render();download(encodeBackup(data),'SNSWatchBox_Candidates_Backup.json');});
+
+/* One-file moving kit; independent old-style backup buttons remain supported. */
+let pendingAllRestore=null,allRestoreToken=0,allRestoreBusy=false;
+function resetAllRestore(){
+ allRestoreToken++;pendingAllRestore=null;
+ $('restoreAllPreview').hidden=true;$('importAll').value='';
+}
+on('exportAll','click',async()=>{
+ if(!store||!data)throw Error('候補データを読み込めません。');
+ await queue.catch(()=>{});
+ const r=await store.load();data=r.data;revision=r.revision;
+ primeCandidates(data.people);
+ const source=encodeBackup(data);
+ const analytics=snapshotAnalytics();
+ const text=encodeCombinedBackup(source,analytics);
+ download(text,'SNSWatchBox_ALL_'+new Date().toISOString().slice(0,10)+'.json');
+ $('restoreAllStatus').textContent='1ファイルを保存しました。候補 '+data.people.length+'人、♡分析 '+analytics.records.length+'件。端末のダウンロード一覧を確認してください。';
+});
+on('importAllButton','click',()=>{$('importAll').click()});
+on('cancelRestoreAll','click',()=>{resetAllRestore();$('restoreAllStatus').textContent='まとめて復元をキャンセルしました。';});
+on('importAll','change',async e=>{
+ const token=++allRestoreToken;pendingAllRestore=null;$('restoreAllPreview').hidden=true;
+ const file=e.target.files?.[0];if(!file)return;
+ if(file.size>COMBINED_MAX_BYTES)throw Error('ファイルは20MB以内にしてください。');
+ const text=await file.text();
+ const restored=decodeCombinedBackup(text,decodeBackup,validateAnalyticsSnapshot);
+ if(token!==allRestoreToken)return;
+ pendingAllRestore=restored;
+ $('restoreAllSummary').textContent='候補 '+restored.candidates.people.length+'人 / ♡分析 '+restored.analytics.records.length+'件 / BOX '+restored.candidates.inbox.length+'件 / 巡回履歴 '+restored.candidates.history.length+'件';
+ $('restoreAllPreview').hidden=false;
+ $('restoreAllStatus').textContent='両方の記録を検証しました。「この内容で復元」を押すまで現在のデータは変更しません。';
+});
+on('confirmRestoreAll','click',async()=>{
+ if(!pendingAllRestore||allRestoreBusy)return;
+ const staged=pendingAllRestore,token=allRestoreToken;
+ allRestoreBusy=true;$('confirmRestoreAll').disabled=true;
+ try{
+  await queue.catch(()=>{});
+  if(token!==allRestoreToken)return;
+  if(!store||!data)throw Error('端末内の保存領域が使えません。');
+  // Apply the small localStorage snapshot first; if IndexedDB fails, restore it.
+  const oldAnalytics=snapshotAnalytics();
+  applyAnalyticsSnapshot(staged.analytics);
+  let saved;
+  try{saved=await store.replace(staged.candidates)}
+  catch(error){
+   try{applyAnalyticsSnapshot(oldAnalytics)}
+   catch(rollbackError){throw Error('復元に失敗し、♡記録を元へ戻すこともできませんでした。旧サイトとバックアップを残し、手動復旧してください。:'+rollbackError.message)}
+   throw error;
+  }
+  data=saved.data;revision=saved.revision;handleDrafts.clear();personDrafts.clear();
+  render();$('recovery').hidden=true;$('storageStatus').textContent='この端末に保存済み';
+  channel?.postMessage('changed');resetAllRestore();
+  $('restoreAllStatus').textContent='復元完了。候補 '+data.people.length+'人、♡分析 '+staged.analytics.records.length+'件。旧サイトと照合してください。';
+  notice('1ファイルからまとめて復元しました。旧サイトは照合が済むまで残してください。');
+ }finally{allRestoreBusy=false;$('confirmRestoreAll').disabled=false;}
+});
+
 function cancelRestore(){restoreToken++;pendingRestore=null;$('restorePreview').hidden=true;$('import').value='';}
 on('cancelRestore','click',cancelRestore);on('import','change',async e=>{const token=++restoreToken;pendingRestore=null;$('restorePreview').hidden=true;const f=e.target.files[0];if(!f)return;if(f.size>LIMITS.bytes)throw new Error('JSONは10MB以内にしてください。');const clean=decodeBackup(await f.text());if(token!==restoreToken)return;pendingRestore=clean;$('restoreSummary').textContent='ジャンル '+clean.genres.length+'個 / 候補 '+clean.people.length+'人 / 収集BOX '+clean.inbox.length+'件 / 履歴 '+clean.history.length+'件';$('restorePreview').hidden=false;});
 on('confirmRestore','click',async()=>{const target=pendingRestore,token=restoreToken;if(!target)return;await queue.catch(()=>{});if(token!==restoreToken)return;const r=await store.replace(target);data=r.data;revision=r.revision;handleDrafts.clear();personDrafts.clear();render();$('recovery').hidden=true;$('storageStatus').textContent='この端末に保存済み';activateUi('backup');cancelRestore();channel?.postMessage('changed');notice('バックアップをRSS試験領域へ復元しました。');maybeAutoSync();});
