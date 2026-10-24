@@ -74,3 +74,34 @@ export function primeCandidates(people){
 }
 export function analyticsFor(person){return {controls:makeControls(person),detail:addDetail(person)}}
 export {refreshMetrics};
+
+/* Unified local JSON migration. These helpers never send analytics to a server. */
+const COMBINED_ANALYTICS_LIMIT = 10_000_000;
+export function validateAnalyticsSnapshot(input){
+ if(!input||input.format!=='sns-watch-analytics-v053'||!Array.isArray(input.records)||input.records.length>5000)throw Error('♡分析記録の形式または件数を確認してください。');
+ const json=JSON.stringify(input);
+ if(new TextEncoder().encode(json).length>COMBINED_ANALYTICS_LIMIT)throw Error('♡分析記録が10MBを超えています。');
+ const seen=new Set();
+ const records=input.records.map(row=>{
+  if(!row||typeof row!=='object'||Array.isArray(row)||!valid(row.handle)||!dateOK(row.registered)||!Number.isSafeInteger(row.likes)||row.likes<0)throw Error('♡分析記録の登録情報が不正です。');
+  const key=row.handle.toLowerCase();
+  if(seen.has(key))throw Error('♡分析記録に同じユーザー名が重複しています。');
+  seen.add(key);
+  if(row.followDate!=null&&!dateOK(row.followDate))throw Error('フォロー確認日が不正です。');
+  const events=row.events??[];
+  if(!Array.isArray(events)||events.length>100000||events.some(e=>!e||typeof e!=='object'||!Number.isFinite(Date.parse(e.at))||!Number.isInteger(e.delta)||Math.abs(e.delta)>1))throw Error('♡記録の履歴データが不正です。');
+  return {...row,events:[...events],followDate:row.followDate??null};
+ });
+ return {format:'sns-watch-analytics-v053',records};
+}
+export function snapshotAnalytics(){
+ return validateAnalyticsSnapshot({format:'sns-watch-analytics-v053',records:[...byHandle.values()]});
+}
+export function applyAnalyticsSnapshot(snapshot){
+ const clean=validateAnalyticsSnapshot(snapshot);
+ // Persist first; on storage failure, never alter the in-memory records.
+ localStorage.setItem(KEY,JSON.stringify({version:1,records:clean.records}));
+ byHandle.clear();
+ for(const row of clean.records)byHandle.set(row.handle.toLowerCase(),row);
+ refreshMetrics();
+}
