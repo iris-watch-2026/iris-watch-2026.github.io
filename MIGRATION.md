@@ -1,6 +1,6 @@
 # SNS WATCH BOX｜1ファイルでの安全な引っ越し
 
-旧URL: https://sasakijoe.github.io/x-patrol-assistant/v054-watch-test/
+旧URL: これまでAndroidで開いていた個人用のSNS WATCH BOX
 新URL: https://iris-watch-2026.github.io/
 
 **旧サイトと旧PWAは、復元結果を確認するまで削除しないでください。**
