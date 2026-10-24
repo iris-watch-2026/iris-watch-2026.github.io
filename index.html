@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#252525">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://keep.md; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>SNS WATCH BOX</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icon.svg">
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+<main>
+  <header class="masthead"><h1>SNS WATCH BOX</h1><small>RSS TEST</small></header>
+  <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+  <noscript><p class="error">JavaScriptを有効にしてください。</p></noscript>
+  <section id="recovery" class="card recovery" hidden><h2>保存データの確認</h2><p>データを読み込めませんでした。元データを保存し、JSONからの復元をお試しください。</p><div class="row"><button id="exportRaw" type="button">元データを保存</button><button id="newData" type="button" class="danger">試験データを初期化</button></div></section>
+  <nav class="tabs" aria-label="ページ切り替え">
+    <button type="button" data-page="people" aria-current="page" aria-label="交流候補"><span aria-hidden="true">☷</span>候補</button>
+    <button type="button" data-page="inbox" aria-label="収集BOX"><span aria-hidden="true">⊞</span>BOX</button>
+    <button type="button" data-page="genres" aria-label="ジャンルと目標"><span aria-hidden="true">▤</span>分類</button>
+    <button type="button" data-page="patrol" aria-label="朝夜巡回"><span aria-hidden="true">◷</span>巡回</button>
+    <button type="button" data-page="backup" aria-label="保存と設定"><span aria-hidden="true">⚙</span>保存</button>
+  </nav>
+  <section id="inbox" class="page card" hidden aria-labelledby="inboxTitle">
+    <div class="section-heading"><h2 id="inboxTitle">収集BOX</h2><span id="inboxCount" class="count-pill"></span></div>
+    <details id="manualImport"><summary>＋ リンク</summary><form id="collectForm"><label for="postUrls">投稿URL・共有テキスト</label><textarea id="postUrls" rows="4" maxlength="32000" placeholder="https://x.com/example_user/status/123456789" spellcheck="false" autocapitalize="off"></textarea><p class="muted">1回100リンクまで。重複は除きます。</p><button id="collectButton" type="submit" data-write>追加</button></form></details>
+    <div id="pasteResults" aria-live="polite"></div>
+    <div class="inbox-actions"><div class="row"><button id="selectInbox" type="button" class="secondary" data-write>全選択</button><button id="clearInbox" type="button" class="secondary" data-write>解除</button></div><label for="promoteGenre">ジャンル<select id="promoteGenre"></select></label><div class="row"><button id="promote" type="button" data-write>候補へ登録</button><button id="deleteInbox" type="button" class="danger" data-write>削除</button></div></div>
+    <div id="inboxList"></div>
+  </section>
+  <section id="people" class="page card" aria-labelledby="peopleTitle">
+    <div class="section-heading"><h2 id="peopleTitle">候補</h2><span id="peopleCount" class="count-pill"></span></div>
+    <div class="candidate-toolbar">
+      <span id="candidateRefreshStatus" class="muted" role="status">新着 −</span><button id="sortModeToggle" class="secondary" type="button" aria-pressed="false">⇅ 並べ替え</button><small id="sortHelp" class="muted">移動元 → 移動先をタップ</small><button id="refreshPeople" type="button" class="secondary" aria-label="登録した候補のRSSを今すぐ確認" aria-busy="false">↻ 今すぐ確認</button>
+      <details id="candidateFilters" class="toolbar-disclosure"><summary aria-label="絞り込みと並べ替え" title="絞り込みと並べ替え">≡</summary><div class="candidate-filters">
+        <label for="filterGenre">ジャンル<select id="filterGenre"></select></label>
+        <label for="patrolFreshness">確認<select id="patrolFreshness"><option value="">すべて</option><option value="new">New</option><option value="unchecked">− 未確認</option><option value="recent">✔ 確認済み</option></select></label>
+        <label for="filterStatus">交流状態<select id="filterStatus"></select></label>
+        <label for="sortPeople">並び順<select id="sortPeople"><option value="manual">手動</option><option value="priority">未確認から</option><option value="oldest">確認が古い順</option><option value="newest">登録が新しい順</option></select></label>
+        <div class="row candidate-tools"><button id="expandPeople" type="button" class="secondary">全展開</button><button id="collapsePeople" type="button" class="secondary">全閉</button><button id="returnToPerson" type="button" class="secondary" hidden>前の行へ</button></div>
+        <details class="bulk-selection"><summary>巡回対象</summary><div class="row"><button id="selectPeople" type="button" class="secondary" data-write>表示中を全選択</button><button id="clearPeople" type="button" class="secondary" data-write>解除</button></div></details>
+      </div></details>
+      <details id="candidateHelp" class="toolbar-disclosure"><summary aria-label="表示の意味と使い方" title="表示の意味と使い方">?</summary><div class="help-body"><p>候補に入れた人を無料RSSで自動確認。初回は基準を保存し、Newを出しません。次からアプリを開く・戻ると照合します。</p><p>人数が多い場合は順番に確認するため時間がかかります。途中で閉じても次回続きから確認します。RSSは約1日ごと・直近20件で、取得できない人は−のままです。PWAを閉じている間は巡回しません。</p><button id="addPilotPeople" type="button" class="secondary" data-write>試験3人を登録</button><p>New RSSで前回より新しい本人投稿を確認。✔ 人間がXの投稿を確認済み。いいねの記録ではありません。取り消しは詳細から。</p><p>− 新着未判定または確認記録なし。取得失敗も未判定です。未確認や時間の経過を新着とは表示しません。</p><p>行をタップで詳細。Xから戻ると、開いた行や表示位置を復元します。</p><p class="tablet-reorder-help">≡ をドラッグで並べ替え。</p><p>いいねはXでご自身で操作してください。</p></div></details>
+    </div>
+    <p id="reorderInstructions" class="sr-only">タブレットでは左端のつまみをドラッグして並べ替えます。キーボードはつまみに移動し、Altと上下矢印で1行移動。Escapeでドラッグを取り消します。表示中の候補だけが移動します。</p>
+    <p id="reorderStatus" class="sr-only" role="status" aria-live="polite"></p>
+    <div class="analytics-panel" aria-label="フォロー転換集計"><div><strong id="analyticsCount">0人</strong><small>分析記録</small></div><div><strong id="analyticsFollow">0人</strong><small>フォロー</small></div><div><strong id="analyticsRate">0%</strong><small>転換率</small></div><div><strong id="analyticsDays">−</strong><small>平均日数</small></div></div>
+<p class="muted" id="analyticsCountHint">候補一覧と分析記録は別保存です。人数が違う場合もあります。</p>
+<div class="analytics-backup"><button id="analyticsExport" type="button" class="secondary">♡記録 保存↓</button><button id="analyticsImportButton" type="button" class="secondary">♡記録 読込↑</button><input type="file" id="analyticsImport" accept=".json,application/json" hidden></div>
+<div id="personList"></div>
+  </section>
+  <section id="genres" class="page card" hidden aria-labelledby="genresTitle"><h2 id="genresTitle">ジャンルと目標</h2><div id="genreList"></div><hr><h3 id="genreFormTitle">ジャンル追加</h3><form id="genreForm"><input id="genreId" type="hidden"><div class="fields"><label for="gname">名前<input id="gname" maxlength="32" required></label><label for="gtarget">目標人数<input id="gtarget" type="number" min="1" max="100000" value="20" required></label></div><label for="gwords">検索キーワード<textarea id="gwords" rows="2" maxlength="4000"></textarea></label><div class="row"><button id="saveGenre" type="submit" data-write>保存</button><button id="cancelGenre" type="button" class="secondary">やめる</button></div></form></section>
+  <section id="patrol" class="page card" hidden aria-labelledby="patrolTitle"><h2 id="patrolTitle">巡回</h2><div class="row"><button id="morning" type="button" data-write>☀ 朝</button><button id="night" type="button" class="secondary" data-write>☾ 夜</button></div><p id="session" class="session" role="status"></p><div id="patrolList"></div><details><summary>過去の確認履歴</summary><p class="muted">取り消した現在の✔とは別に、過去に行った確認の履歴を残します。</p><p id="historyCount" class="muted"></p><div id="historyList"></div></details></section>
+  <section id="backup" class="page card" hidden aria-labelledby="backupTitle"><h2 id="backupTitle">保存</h2><p class="muted">旧URLから移行する場合は、旧サイトで「候補JSON」と「♡記録JSON」の2種類を先に保存してください。ここではそれぞれの「読込」から復元します。端末内データはURL間で自動移行されません。旧サイトは削除しないでください。</p><p id="storageStatus" class="storage-status" role="status">保存領域を確認中…</p><div id="stats" class="stats" aria-label="登録状況"></div><button id="export" type="button" data-write>JSONを保存</button><label for="import">JSONから復元<input type="file" id="import" accept=".json,application/json"></label><div id="restorePreview" class="restore-preview" hidden><h3>復元内容</h3><p id="restoreSummary"></p><p>この試験版のデータを置き換えます。先にJSONを保存してください。</p><div class="row"><button id="confirmRestore" type="button">復元する</button><button id="cancelRestore" type="button" class="secondary">やめる</button></div></div>
+    <details><summary>データについて</summary><p>このブラウザ・端末への保存です。端末変更やブラウザデータ削除の前にJSONを保存してください。RSS確認記録もJSONに入ります。</p><p>初回は旧UI試験版のデータを読み取り、独立したRSS試験領域へコピーします。なければV0.5以前を確認します。元の保存領域は残り、以後は同期しません。自動コピーできない場合は旧版のJSONを復元してください。</p><p>V0.2〜V0.5・V0.51のJSON、10MBまで。</p></details>
+    <details><summary>Android・ヘルプ</summary><p>Chromeの「アプリをインストール」から追加。Xの投稿の「共有」→「その他のアプリ」から「SNS WATCH RSS 試験」へ共有できます。</p><div class="row"><button id="install" type="button" class="secondary" hidden>インストール</button><button id="persistent" type="button" class="secondary">端末保存を保護</button></div><p id="pwaStatus" class="muted" role="status"></p><p>共有先が出ない場合はリンクをコピーし、BOXの「＋ リンク」へ。共有URLはGET形式でホストに送られ、受信後は画面URLから消去します。</p><p>Android実機の共有・インストール・外部Xアプリからの復帰はHuman Gateで確認してください。</p><p><a href="./Android.md" target="_blank" rel="noopener noreferrer">Android実機チェック ↗</a> · <a href="./README.md" target="_blank" rel="noopener noreferrer">README ↗</a></p><p>独立試験版。無料RSSを使用します。X API・当アプリによるXスクレイピング・自動いいね・常時クリップボード監視は使用しません。</p></details>
+  </section>
+</main>
+</body>
+</html>
